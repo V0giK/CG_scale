@@ -203,14 +203,14 @@ void resetCPU() {
 
 // convert time to string
 char *TimeToString(unsigned long t) {
-  static char str[13];
+  static char str[15];
   int h = t / 3600000;
   t = t % 3600000;
   int m = t / 60000;
   t = t % 60000;
   int s = t / 1000;
-  int ms = t - (s * 1000);
-  sprintf(str, "%02ld:%02d:%02d.%03d", h, m, s, ms);
+  int ms = t % 1000;
+  sprintf(str, "%02d:%02d:%02d.%03d", h, m, s, ms);
   return str;
 }
 
@@ -993,7 +993,7 @@ void saveParameter() {
   EEPROM.put(P_LC3_URL, loadCellURL[LC3]);
   EEPROM.commit();
 
-  if (model.name != "") {
+  if (strlen(model.name) > 0) {
     saveModelJson(model.name);
   }
 
@@ -1034,8 +1034,8 @@ void saveModel() {
       if (virtw) {
         for (int i = 0; i < MAX_VIRTUAL_WEIGHT; i++) {
           model.virtualWeight[i].name = virtw[i][0].as<String>();
-          model.virtualWeight[i].weight = virtw[i][1].as<int>();
-          model.virtualWeight[i].cg = virtw[i][2].as<int>();
+          model.virtualWeight[i].cg = virtw[i][1].as<int>();
+          model.virtualWeight[i].weight = virtw[i][2].as<int>();
           model.virtualWeight[i].enabled = virtw[i][3].as<bool>();
         }
       }
@@ -1076,7 +1076,7 @@ String getContentType(String filename) {
   if (filename.endsWith(".html"))
     return "text/html";
   else if (filename.endsWith(".png"))
-    return "text/css";
+    return "image/png";
   else if (filename.endsWith(".css"))
     return "text/css";
   else if (filename.endsWith(".js"))
@@ -1106,7 +1106,7 @@ bool handleFileRead(String path) {
       path += ".gz";
     }
     File file = LittleFS.open(path, "r");
-    size_t sent = server.streamFile(file, contentType);
+    server.streamFile(file, contentType);
     file.close();
     return true;
   }
@@ -1126,6 +1126,7 @@ void handleFileUpload() {
 
     if (filename != MODEL_FILE) {
       server.send(500, "text/plain", "wrong file !");
+      return;
     }
 
     // Open the file for writing in LittleFS (create if it doesn't exist)
@@ -1367,157 +1368,144 @@ void setup() {
 
 #if defined(ESP8266)
 
-    printConsole(T_BOOT, "Wifi: STA mode - connecting with: " + String(ssid_STA));
+  printConsole(T_BOOT, "Wifi: STA mode - connecting with: " + String(ssid_STA));
 
-    // Start by connecting to a WiFi network
-    WiFi.persistent(false);
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid_STA, password_STA);
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid_STA, password_STA);
 
+  waitWiFiconnected();
+
+  if (nLoadcells == 1 && WiFi.status() != WL_CONNECTED) {
+    WiFi.begin(ssid_AP, password_AP);
     waitWiFiconnected();
-
-    // in slave mode connect to AP network
-    if (nLoadcells == 1 && WiFi.status() != WL_CONNECTED) {
-      WiFi.begin(ssid_AP, password_AP);
-      waitWiFiconnected();
+  }
+  /*long timeoutWiFi = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    if (WiFi.status() == WL_NO_SSID_AVAIL) {
+      printConsole(T_ERROR, "\nWifi: No SSID available");
+      break;
+    } else if (WiFi.status() == WL_CONNECT_FAILED) {
+      printConsole(T_ERROR, "\nWifi: Connection failed");
+      break;
+    } else if ((millis() - timeoutWiFi) > TIMEOUT_CONNECT) {
+      printConsole(T_ERROR, "\nWifi: Timeout");
+      break;
     }
-    /*long timeoutWiFi = millis();
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      if (WiFi.status() == WL_NO_SSID_AVAIL) {
-        printConsole(T_ERROR, "\nWifi: No SSID available");
-        break;
-      } else if (WiFi.status() == WL_CONNECT_FAILED) {
-        printConsole(T_ERROR, "\nWifi: Connection failed");
-        break;
-      } else if ((millis() - timeoutWiFi) > TIMEOUT_CONNECT) {
-        printConsole(T_ERROR, "\nWifi: Timeout");
-        break;
-      }
-    }*/
+  }*/
 
-    if (WiFi.status() != WL_CONNECTED) {
-      // if WiFi not connected, switch to access point mode
-      wifiSTAmode = false;
-      printConsole(T_BOOT, "Wifi: AP mode - create access point: " + String(ssid_AP));
-      WiFi.mode(WIFI_AP);
-      WiFi.softAPConfig(apIP, apIP,
-                        IPAddress(255, 255, 255, 0));
-      WiFi.softAP(ssid_AP, password_AP);
-      printConsole(T_RUN, "Wifi: Connected, IP: " + String(WiFi.softAPIP().toString()));
-    } else {
-      printConsole(T_RUN, "Wifi: Connected, IP: " + String(WiFi.localIP().toString()));
-    }
+  if (WiFi.status() != WL_CONNECTED) {
+    wifiSTAmode = false;
+    printConsole(T_BOOT, "Wifi: AP mode - create access point: " + String(ssid_AP));
+    WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(apIP, apIP,
+                      IPAddress(255, 255, 255, 0));
+    WiFi.softAP(ssid_AP, password_AP);
+    printConsole(T_RUN, "Wifi: Connected, IP: " + String(WiFi.softAPIP().toString()));
+  } else {
+    printConsole(T_RUN, "Wifi: Connected, IP: " + String(WiFi.localIP().toString()));
+  }
 
-    // Set Hostname
-    String hostname = "disabled";
+  String hostname = "disabled";
 #if ENABLE_MDNS
-    hostname = device_Name;
-    hostname.replace(" ", "");
-    hostname.toLowerCase();
-    if (!MDNS.begin(hostname, WiFi.localIP())) {
-      hostname = "mDNS failed";
-      printConsole(T_ERROR, "Wifi: " + hostname);
-    } else {
-      hostname += ".local";
-      printConsole(T_RUN, "Wifi hostname: " + hostname);
-    }
+  hostname = device_Name;
+  hostname.replace(" ", "");
+  hostname.toLowerCase();
+  if (!MDNS.begin(hostname, WiFi.localIP())) {
+    hostname = "mDNS failed";
+    printConsole(T_ERROR, "Wifi: " + hostname);
+  } else {
+    hostname += ".local";
+    printConsole(T_RUN, "Wifi hostname: " + hostname);
+  }
 #endif
 
-    if (wifiSTAmode) {
-      printOLED("WiFi: " + String(ssid_STA),
-                "Host: " + String(hostname),
-                "IP: " + WiFi.localIP().toString());
-    } else {
-      printOLED("WiFi: " + String(ssid_AP),
-                "Host: " + String(hostname),
-                "IP: " + WiFi.softAPIP().toString());
+  if (wifiSTAmode) {
+    printOLED("WiFi: " + String(ssid_STA),
+              "Host: " + String(hostname),
+              "IP: " + WiFi.localIP().toString());
+  } else {
+    printOLED("WiFi: " + String(ssid_AP),
+              "Host: " + String(hostname),
+              "IP: " + WiFi.softAPIP().toString());
+  }
+
+  delay(3000);
+
+  server.on("/getHead", getHead);
+  server.on("/getValue", getValue);
+  server.on("/getRawValue", getRawValue);
+  server.on("/getParameter", getParameter);
+  server.on("/getWiFiNetworks", getWiFiNetworks);
+  server.on("/getVirtualWeight", getVirtualWeight);
+  server.on("/saveParameter", saveParameter);
+  server.on("/autoCalibrate", autoCalibrate);
+  server.on("/tare", runTare);
+  server.on("/saveModel", saveModel);
+  server.on("/openModel", openModel);
+  server.on("/deleteModel", deleteModel);
+
+  server.on("/settings.html", HTTP_POST, []() { server.send(200, "text/plain", ""); }, handleFileUpload);
+
+  server.onNotFound([]() {
+    if (!handleFileRead(server.uri())) {
+      server.send(404, "text/plain", "CGscale Error: 404\n File or URL not Found !");
     }
+  });
 
-    delay(3000);
+  ElegantOTA.begin(&server);
 
-    // When the client requests data
-    server.on("/getHead", getHead);
-    server.on("/getValue", getValue);
-    server.on("/getRawValue", getRawValue);
-    server.on("/getParameter", getParameter);
-    server.on("/getWiFiNetworks", getWiFiNetworks);
-    server.on("/getVirtualWeight", getVirtualWeight);
-    server.on("/saveParameter", saveParameter);
-    server.on("/autoCalibrate", autoCalibrate);
-    server.on("/tare", runTare);
-    server.on("/saveModel", saveModel);
-    server.on("/openModel", openModel);
-    server.on("/deleteModel", deleteModel);
+  server.begin();
+  printConsole(T_RUN, "Webserver is up and running");
 
-    // When the client upload file
-    server.on("/settings.html", HTTP_POST, []() { server.send(200, "text/plain", ""); }, handleFileUpload);
+  if (enableOTA) {
+    ArduinoOTA.setHostname(ssid_AP);
+    ArduinoOTA.setPassword(password_AP);
 
-    // If the client requests any URI
-    server.onNotFound([]() {
-      if (!handleFileRead(server.uri())) {
-        server.send(404, "text/plain", "CGscale Error: 404\n File or URL not Found !");
+    ArduinoOTA.onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH) {
+        type = "firmware";
+      } else {
+        type = "LittleFS";
       }
+      updateMsg = "Updating " + type;
+      printConsole(T_UPDATE, type);
     });
 
-    // init ElegantOTA
-    ElegantOTA.begin(&server);
+    ArduinoOTA.onEnd([]() {
+      updateMsg = "successful..";
+      printUpdateProgress(100, 100);
+    });
 
-    // init webserver
-    server.begin();
-    printConsole(T_RUN, "Webserver is up and running");
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+      printUpdateProgress(progress, total);
+    });
 
-    // init OTA (over the air update)
-    if (enableOTA) {
-      ArduinoOTA.setHostname(ssid_AP);
-      ArduinoOTA.setPassword(password_AP);
+    ArduinoOTA.onError([](ota_error_t error) {
+      if (error == OTA_AUTH_ERROR) {
+        updateMsg = "Auth Failed";
+      } else if (error == OTA_BEGIN_ERROR) {
+        updateMsg = "Begin Failed";
+      } else if (error == OTA_CONNECT_ERROR) {
+        updateMsg = "Connect Failed";
+      } else if (error == OTA_RECEIVE_ERROR) {
+        updateMsg = "Receive Failed";
+      } else if (error == OTA_END_ERROR) {
+        updateMsg = "End Failed";
+      }
+      printUpdateProgress(0, 100);
+    });
 
-      ArduinoOTA.onStart([]() {
-        String type;
-        if (ArduinoOTA.getCommand() == U_FLASH) {
-          type = "firmware";
-        } else {  // U_LittleFS
-          type = "LittleFS";
-        }
-        // NOTE: if updating LittleFS this would be the place to unmount LittleFS using LittleFS.end()
-        updateMsg = "Updating " + type;
-        printConsole(T_UPDATE, type);
-      });
+    ArduinoOTA.begin();
+    printConsole(T_RUN, "OTA is up and running");
+  }
 
-      ArduinoOTA.onEnd([]() {
-        updateMsg = "successful..";
-        printUpdateProgress(100, 100);
-      });
-
-      ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        printUpdateProgress(progress, total);
-      });
-
-      ArduinoOTA.onError([](ota_error_t error) {
-        if (error == OTA_AUTH_ERROR) {
-          updateMsg = "Auth Failed";
-        } else if (error == OTA_BEGIN_ERROR) {
-          updateMsg = "Begin Failed";
-        } else if (error == OTA_CONNECT_ERROR) {
-          updateMsg = "Connect Failed";
-        } else if (error == OTA_RECEIVE_ERROR) {
-          updateMsg = "Receive Failed";
-        } else if (error == OTA_END_ERROR) {
-          updateMsg = "End Failed";
-        }
-        printUpdateProgress(0, 100);
-      });
-
-      ArduinoOTA.begin();
-      printConsole(T_RUN, "OTA is up and running");
-    }
-
-    // https update
-    httpsClient.setInsecure();
-    if (enableUpdate) {
-      // check for update
-      httpsUpdate(PROBE_UPDATE);
-    }
+  httpsClient.setInsecure();
+  if (enableUpdate) {
+    httpsUpdate(PROBE_UPDATE);
+  }
 
 #endif
 }
