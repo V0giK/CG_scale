@@ -95,8 +95,6 @@
 #include <EEPROM.h>
 #include <Wire.h>
 
-// libraries for ESP8266
-#if defined(ESP8266)
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
 #include <ESP8266HTTPClient.h>
@@ -107,27 +105,18 @@
 #include <LittleFS.h>
 #include <WiFiClientSecure.h>
 #include <WiFiUdp.h>
-#endif
 
-// load settings
-#if defined(__AVR__)
-#include "settings_AVR.h"
-#elif defined(ESP8266)
 #include "settings_ESP8266.h"
-#endif
 
 // HX711 constructor array (dout pin, sck pint):
 HX711_ADC LoadCell[]{HX711_ADC(PIN_LOADCELL1_DOUT, PIN_LOADCELL1_PD_SCK),
                      HX711_ADC(PIN_LOADCELL2_DOUT, PIN_LOADCELL2_PD_SCK),
                      HX711_ADC(PIN_LOADCELL3_DOUT, PIN_LOADCELL3_PD_SCK)};
 
-// webserver constructor
-#if defined(ESP8266)
 ESP8266WebServer server(80);
 IPAddress apIP(ip[0], ip[1], ip[2], ip[3]);
 WiFiClientSecure httpsClient;
-File fsUploadFile;  // a File object to temporarily store the received file
-#endif
+File fsUploadFile;
 
 #include "defaults.h"
 
@@ -140,13 +129,11 @@ struct VirtualWeight {
 
 struct Model {
   float distance[3] = {DISTANCE_X1, DISTANCE_X2, DISTANCE_X3};
-#if defined(ESP8266)
   char name[MAX_MODELNAME_LENGHT + 1] = "";
   float targetCGmin = 0;
   float targetCGmax = 0;
   uint8_t mechanicsType = 0;
   VirtualWeight virtualWeight[MAX_VIRTUAL_WEIGHT];
-#endif
 };
 
 Model model;
@@ -159,7 +146,6 @@ uint8_t batType = BAT_TYPE;
 uint8_t batCells = BAT_CELLS;
 float refWeight = REF_WEIGHT;
 float refCG = REF_CG;
-#if defined(ESP8266)
 char device_Name[MAX_SSID_PW_LENGHT + 1] = SSID_AP;
 char ssid_STA[MAX_SSID_PW_LENGHT + 1] = SSID_STA;
 char password_STA[MAX_SSID_PW_LENGHT + 1] = PASSWORD_STA;
@@ -168,7 +154,6 @@ char password_AP[MAX_SSID_PW_LENGHT + 1] = PASSWORD_AP;
 char loadCellURL[3][MAX_SSID_PW_LENGHT + 1] = {"", "", ""};
 bool enableUpdate = ENABLE_UPDATE;
 bool enableOTA = ENABLE_OTA;
-#endif
 
 // declare variables
 float weightLoadCell[] = {0, 0, 0};
@@ -187,19 +172,12 @@ const uint8_t *oledFontBig;
 const uint8_t *oledFontLarge;
 const uint8_t *oledFontNormal;
 const uint8_t *oledFontSmall;
-#if defined(ESP8266)
 String updateMsg = "";
 bool wifiSTAmode = true;
 float gitVersion = -1;
-#endif
 
-// Restart CPU
-#if defined(__AVR__)
-void (*resetCPU)(void) = 0;
-#elif defined(ESP8266)
 void resetCPU() {
 }
-#endif
 
 // convert time to string
 char *TimeToString(unsigned long t) {
@@ -388,7 +366,6 @@ void printScaleOLED() {
         }
       }
 
-#if defined(ESP8266)
       if (DISPLAY_HEIGHT <= 32 && (strlen(loadCellURL[LC1]) || strlen(loadCellURL[LC2]) || strlen(loadCellURL[LC3]))) {
         oledDisplay.setFont(oledFontBig);
         float weight = 0;
@@ -404,7 +381,6 @@ void printScaleOLED() {
         oledDisplay.print(buff);
         oledDisplay.print(F(" g"));
       } else {
-#endif
         // print total weight
         if (nLoadcells == 1) {
           oledDisplay.setFont(oledFontBig);
@@ -459,9 +435,7 @@ void printScaleOLED() {
           oledDisplay.print(buff);
           oledDisplay.print(F(" mm"));
         }
-#if defined(ESP8266)
       }
-#endif
     } else {
       oledDisplay.setFont(oledFontSmall);
       for (int i = 1; i <= errMsgCnt; i++) {
@@ -499,9 +473,7 @@ void saveCalFactor(int nLC) {
   LoadCell[nLC].setCalFactor(calFactorLoadcell[nLC]);
   EEPROM.put(P_LOADCELL1_CALIBRATION_FACTOR + (nLC * sizeof(float)),
              calFactorLoadcell[nLC]);
-#if defined(ESP8266)
   EEPROM.commit();
-#endif
 }
 
 void updateLoadcells() {
@@ -515,13 +487,9 @@ void updateLoadcells() {
 void tareLoadcells() {
   for (int i = LC1; i <= LC3; i++) {
     if (i < nLoadcells) {
-#if defined(ESP8266)
       if (strlen(loadCellURL[i]) == 0) {
         LoadCell[i].tare();
       }
-#else
-      LoadCell[i].tare();
-#endif
     }
   }
 }
@@ -565,9 +533,7 @@ bool getLoadcellError() {
       if (LoadCell[i].getTareTimeoutFlag()) {
         String msg = "ERROR: Timeout TARE Lc" + String(i + 1);
         errMsg[++errMsgCnt] = msg + "\n";
-#if defined(ESP8266)
         printConsole(T_ERROR, msg);
-#endif
         err = true;
       }
     }
@@ -575,8 +541,6 @@ bool getLoadcellError() {
 
   return err;
 }
-
-#if defined(ESP8266)
 
 void writeModelData(JsonObject object) {
   char buff[8];
@@ -1234,22 +1198,17 @@ void waitWiFiconnected() {
   }
 }
 
-#endif
-
 void setup() {
   // init serial
   Serial.begin(115200);
   Serial.println();
   delay(1000);
 
-#if defined(ESP8266)
   printConsole(T_BOOT, "startup CG scale V" + String(CGSCALE_VERSION));
 
-  // init filesystem
   LittleFS.begin();
   EEPROM.begin(EEPROM_SIZE);
   printConsole(T_BOOT, "init filesystem");
-#endif
 
   // read settings from eeprom
   if (EEPROM.read(P_NUMBER_LOADCELLS) != 0xFF) {
@@ -1288,7 +1247,6 @@ void setup() {
     }
   }
 
-#if defined(ESP8266)
   if (EEPROM.read(P_SSID_STA) != 0xFF) {
     EEPROM.get(P_SSID_STA, ssid_STA);
   }
@@ -1335,14 +1293,11 @@ void setup() {
     EEPROM.get(P_LC3_URL, loadCellURL[LC3]);
   }
 
-  // load current model
   printConsole(T_BOOT, "open last model");
   if (!openModelJson(model.name)) {
     saveModelJson(DEFAULT_NAME);
     openModelJson(DEFAULT_NAME);
   }
-
-#endif
 
   // init OLED display
   initOLED();
@@ -1352,9 +1307,7 @@ void setup() {
     if (i < nLoadcells) {
       LoadCell[i].begin();
       LoadCell[i].setCalFactor(calFactorLoadcell[i]);
-#if defined(ESP8266)
       printConsole(T_BOOT, "init Loadcell " + String(i + 1));
-#endif
     }
   }
 
@@ -1365,8 +1318,6 @@ void setup() {
 
   tareLoadcells();
   getLoadcellError();
-
-#if defined(ESP8266)
 
   printConsole(T_BOOT, "Wifi: STA mode - connecting with: " + String(ssid_STA));
 
@@ -1507,11 +1458,9 @@ void setup() {
     httpsUpdate(PROBE_UPDATE);
   }
 
-#endif
 }
 
 void loop() {
-#if defined(ESP8266)
 
 #if ENABLE_MDNS
   MDNS.update();
@@ -1521,7 +1470,6 @@ void loop() {
     ArduinoOTA.handle();
   }
   server.handleClient();
-#endif
 
 #ifdef PIN_TARE_BUTTON
   handleTareBtn();
@@ -1549,18 +1497,12 @@ void loop() {
     // get Loadcell weights
     for (int i = LC1; i <= LC3; i++) {
       if (i < nLoadcells) {
-#if defined(ESP8266)
         if (strlen(loadCellURL[i]) == 0) {
-#endif
-          // get local data
           weightLoadCell[i] = LoadCell[i].getData();
 
-          // IIR filter
           weightLoadCell[i] = weightLoadCell[i] + SMOOTHING_LOADCELL * (lastWeightLoadCell[i] - weightLoadCell[i]);
           lastWeightLoadCell[i] = weightLoadCell[i];
-#if defined(ESP8266)
         } else {
-          // get data from external server
           WiFiClient client;
           HTTPClient http;
 
@@ -1572,7 +1514,6 @@ void loop() {
           if (httpCode == HTTP_CODE_OK) {
             const String &txt = http.getString();
 
-            // split response string
             int delimiterStartIndex = 0;
             int delimiterEndIndex = 0;
             String subString[10];
@@ -1598,7 +1539,6 @@ void loop() {
 
           http.end();
         }
-#endif
       }
     }
   }
@@ -1618,18 +1558,11 @@ void loop() {
         // CG longitudinal axis
         CG_length = ((weightLoadCell[LC2] * model.distance[X2]) / weightTotal) + model.distance[X1];
 
-#if defined(ESP8266)
         if (model.mechanicsType == 2) {
           CG_length = ((weightLoadCell[LC2] * model.distance[X2]) / weightTotal) - model.distance[X1];
         } else if (model.mechanicsType == 3) {
           CG_length = ((weightLoadCell[LC2] * model.distance[X2]) / weightTotal) * -1 + model.distance[X1];
         }
-
-        /* Virtual weights
-        m = weight
-        d = cg
-        d_new=(m1*d1+m2*d2)/(m1+m2)
-        */
 
         for (int i = 0; i < MAX_VIRTUAL_WEIGHT; i++) {
           if (model.virtualWeight[i].enabled == true) {
@@ -1642,8 +1575,6 @@ void loop() {
             weightTotal += model.virtualWeight[i].weight;
           }
         }
-
-#endif
 
         // CG transverse axis
         if (nLoadcells == 3) {
@@ -1668,36 +1599,28 @@ void loop() {
           case MENU_LOADCELLS:
             nLoadcells = Serial.parseInt();
             EEPROM.put(P_NUMBER_LOADCELLS, nLoadcells);
-#if defined(ESP8266)
             EEPROM.commit();
-#endif
             menuPage = 0;
             updateMenu = true;
             break;
           case MENU_DISTANCE_X1 ... MENU_DISTANCE_X3:
             model.distance[menuPage - MENU_DISTANCE_X1] = Serial.parseFloat();
             EEPROM.put(P_DISTANCE_X1 + ((menuPage - MENU_DISTANCE_X1) * sizeof(float)), model.distance[menuPage - MENU_DISTANCE_X1]);
-#if defined(ESP8266)
             EEPROM.commit();
-#endif
             menuPage = 0;
             updateMenu = true;
             break;
           case MENU_REF_WEIGHT:
             refWeight = Serial.parseFloat();
             EEPROM.put(P_REF_WEIGHT, refWeight);
-#if defined(ESP8266)
             EEPROM.commit();
-#endif
             menuPage = 0;
             updateMenu = true;
             break;
           case MENU_REF_CG:
             refCG = Serial.parseFloat();
             EEPROM.put(P_REF_CG, refCG);
-#if defined(ESP8266)
             EEPROM.commit();
-#endif
             menuPage = 0;
             updateMenu = true;
             break;
@@ -1717,27 +1640,21 @@ void loop() {
           case MENU_RESISTOR_R1 ... MENU_RESISTOR_R2:
             resistor[menuPage - MENU_RESISTOR_R1] = Serial.parseFloat();
             EEPROM.put(P_RESISTOR_R1 + ((menuPage - MENU_RESISTOR_R1) * sizeof(float)), resistor[menuPage - MENU_RESISTOR_R1]);
-#if defined(ESP8266)
             EEPROM.commit();
-#endif
             menuPage = 0;
             updateMenu = true;
             break;
           case MENU_BATTERY_MEASUREMENT:
             batType = Serial.parseInt();
             EEPROM.put(P_BAT_TYPE, batType);
-#if defined(ESP8266)
             EEPROM.commit();
-#endif
             menuPage = 0;
             updateMenu = true;
             break;
           case MENU_BATTERY_CELLS:
             batCells = Serial.parseInt();
             EEPROM.put(P_BATT_CELLS, batCells);
-#if defined(ESP8266)
             EEPROM.commit();
-#endif
             menuPage = 0;
             updateMenu = true;
             break;
@@ -1748,13 +1665,10 @@ void loop() {
                 EEPROM.write(i, 0xFF);
               }
               Serial.end();
-#if defined(ESP8266)
               EEPROM.commit();
-              // delete json model file
               if (LittleFS.exists(MODEL_FILE)) {
                 LittleFS.remove(MODEL_FILE);
               }
-#endif
               resetCPU();
             }
             menuPage = 0;
@@ -1839,10 +1753,8 @@ void loop() {
           Serial.print(MENU_SHOW_ACTUAL);
           Serial.print(F(" - Show actual values\n"));
 
-#if defined(ESP8266)
           Serial.print(MENU_WIFI_INFO);
           Serial.print(F(" - Show WiFi network info\n"));
-#endif
 
           Serial.print(MENU_RESET_DEFAULT);
           Serial.print(F(" - Reset to factory defaults\n"));
@@ -1957,7 +1869,6 @@ void loop() {
           }
           Serial.println();
           break;
-#if defined(ESP8266)
         case MENU_WIFI_INFO: {
           Serial.println(
               "\n\n********************************************\nWiFi network "
@@ -1976,7 +1887,6 @@ void loop() {
             Serial.println("no networks found");
           } else {
             for (int i = 0; i < wifiCnt; ++i) {
-              // Print SSID and RSSI for each network found
               Serial.print(i + 1);
               Serial.print(": ");
               Serial.print(WiFi.SSID(i));
@@ -2003,7 +1913,6 @@ void loop() {
         }
           updateMenu = false;
           break;
-#endif
         case MENU_RESET_DEFAULT:
           Serial.print(F("\n\nReset to factory defaults (J/N)?\n"));
           updateMenu = false;
