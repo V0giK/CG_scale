@@ -10,9 +10,8 @@
 
   ******************************************************************
   history:
-  V2.4.0  03.01.25     Restructured files to use Platformio
-                       Configured Platformio
-                       Implemented ESPNow to send data to ServotesterDeluxe
+   V2.4.0  03.01.25     Restructured files to use Platformio
+                        Configured Platformio
   V2.3.4  26.09.24     settings.html text fix SPIFFS to LittleFS
                        Release 2.3.4
   V2.3.3  26.09.24     fix Litt.leFS
@@ -86,12 +85,7 @@
 
 */
 
-// **** Please UNCOMMENT to choose special hardware *****************
 
-// #define WIFI_KIT_8    //is a ESP8266 based board, with integrated OLED and
-// battery management
-
-// ******************************************************************
 
 // Required libraries, can be installed from the library manager
 #include <HX711_ADC.h>  // library for the HX711 24-bit ADC for weight scales (https://github.com/olkal/HX711_ADC)
@@ -100,12 +94,6 @@
 // built-in libraries
 #include <EEPROM.h>
 #include <Wire.h>
-
-// Activate ESPNOW
-#define ESPNOW
-#if defined(ESPNOW)
-#include "ESPNow_core.h"
-#endif
 
 // libraries for ESP8266
 #if defined(ESP8266)
@@ -125,11 +113,7 @@
 #if defined(__AVR__)
 #include "settings_AVR.h"
 #elif defined(ESP8266)
-#ifdef WIFI_KIT_8
-#include "settings_WIFI_KIT_8.h"
-#else
 #include "settings_ESP8266.h"
-#endif
 #endif
 
 // HX711 constructor array (dout pin, sck pint):
@@ -187,8 +171,6 @@ bool enableOTA = ENABLE_OTA;
 #endif
 
 // declare variables
-static unsigned long ESPNow_sendOld;
-
 float weightLoadCell[] = {0, 0, 0};
 float lastWeightLoadCell[] = {0, 0, 0};
 float weightTotal = 0;
@@ -293,24 +275,6 @@ void printConsole(int t, String msg) {
   }
   Serial.print("] ");
   Serial.println(msg);
-}
-
-void initESPNow() {
-  WiFi.mode(WIFI_STA);
-#ifdef ESP32
-  esp_wifi_set_channel(CHANNEL, WIFI_SECOND_CHAN_NONE);
-  Serial.print("ESP32 STA MAC: ");
-#else
-  WiFi.channel(CHANNEL);
-  Serial.print("ESP8266 STA MAC: ");
-#endif
-
-  Serial.print("STA MAC: ");
-  Serial.println(WiFi.macAddress());
-  Serial.print("STA CHANNEL ");
-  Serial.println(WiFi.channel());
-  InitESPNow();
-  esp_now_register_send_cb(OnDataSent);
 }
 
 void initOLED() {
@@ -506,28 +470,6 @@ void printScaleOLED() {
       }
     }
   } while (oledDisplay.nextPage());
-}
-
-void sendESPNow() {
-  ESPNowData.type = 2;
-  ESPNowData.U_Lipo = batVolt;
-  ESPNowData.Bat_Type = batType;
-  ESPNowData.Model_Weight = weightTotal;
-  ESPNowData.Model_CG = CG_length;
-  ESPNowData.Model_CG_Trans = CG_trans;
-
-  if (millis() - ESPNow_sendOld > 200) {
-    ESPNow_sendOld = millis();
-    bool slaveFound = ScanForSlave();
-    if (slaveFound) {
-      bool isPaired = manageSlave();
-      if (isPaired) {
-        sendData();
-      } else {
-        printConsole(T_ERROR, "Slave pair failed!");
-      }
-    }
-  }
 }
 
 #ifdef PIN_TARE_BUTTON
@@ -1401,19 +1343,6 @@ void setup() {
 
 #endif
 
-  bool wifiIsUsed = false;
-#if defined(ESPNOW)
-  initESPNow();
-  wifiIsUsed = ScanForSlave();
-#endif
-
-  Serial.print("Wifi is used: ");
-  Serial.println(wifiIsUsed);
-
-  if (wifiIsUsed) {
-    printConsole(T_BOOT, "Wifi: ESPNOW mode - connected.");
-  }
-
   // init OLED display
   initOLED();
 
@@ -1436,7 +1365,6 @@ void setup() {
   tareLoadcells();
   getLoadcellError();
 
-  if (!wifiIsUsed) {
 #if defined(ESP8266)
 
     printConsole(T_BOOT, "Wifi: STA mode - connecting with: " + String(ssid_STA));
@@ -1592,10 +1520,6 @@ void setup() {
     }
 
 #endif
-  } else {
-    printOLED("WiFi: ESPNOW", "", "");
-    delay(3000);
-  }
 }
 
 void loop() {
@@ -1744,10 +1668,6 @@ void loop() {
     }
 
     printScaleOLED();
-
-#if defined(ESPNOW)
-    sendESPNow();
-#endif
 
     // serial connection
     if (Serial) {
