@@ -51,8 +51,10 @@ CG scale with 3 Loadcells:
 #define PIN_LOADCELL2_DOUT            D6
 #define PIN_LOADCELL2_PD_SCK          D5
 
-#define PIN_LOADCELL3_DOUT            D7
-#define PIN_LOADCELL3_PD_SCK          D0
+#define PIN_LOADCELL3_DOUT            D0
+#define PIN_LOADCELL3_PD_SCK          D7
+
+#define PIN_TARE_BUTTON               D8
 
 
 
@@ -97,7 +99,7 @@ U8G2_SH1106_128X64_NONAME_1_HW_I2C oledDisplay(U8G2_R0, /* reset=*/ U8X8_PIN_NON
 #define V_REF                         3300     // set supply voltage from 1800 to 5500mV
 
 // voltage divider
-#define RESISTOR_R1                   20000    // ohm
+#define RESISTOR_R1                   19100    // ohm
 #define RESISTOR_R2                   10000    // ohm
 
 /*
@@ -122,7 +124,7 @@ U8G2_SH1106_128X64_NONAME_1_HW_I2C oledDisplay(U8G2_R0, /* reset=*/ U8X8_PIN_NON
 #define ENABLE_PERCENTLIST            true
 
 // Battery type
-#define BAT_TYPE                      B_VOLT
+#define BAT_TYPE                      B_LIION
 
 // Battery cells
 #define BAT_CELLS                     2
@@ -143,7 +145,7 @@ U8G2_SH1106_128X64_NONAME_1_HW_I2C oledDisplay(U8G2_R0, /* reset=*/ U8X8_PIN_NON
 #define PASSWORD_AP                 ""
 const char ip[4] =                  {1,2,3,4};    // default IP address
 
-#define ENABLE_MDNS                 true          // enable mDNS to reach the webpage with hostname.local
+#define ENABLE_MDNS                 false          // enable mDNS to reach the webpage with hostname.local
 #define ENABLE_OTA                  true          // enable over the air update
 
 
@@ -153,7 +155,7 @@ const char ip[4] =                  {1,2,3,4};    // default IP address
 #define ENABLE_UPDATE               true
 #define HTTPS_PORT                  443
 #define HOST                        "github.com"
-#define URL                         "/shockyfan/CG_scale/releases/latest"
+#define URL                         "/V0giK/CG_scale/releases/latest"
 
 
 
