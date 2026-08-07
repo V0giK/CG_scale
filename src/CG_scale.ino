@@ -176,52 +176,11 @@ String updateMsg = "";
 bool wifiSTAmode = true;
 float gitVersion = -1;
 
-void resetCPU() {
-}
+// System helpers + console logging — see Util.h
+#include "Util.h"
 
-// convert time to string
-char *TimeToString(unsigned long t) {
-  static char str[15];
-  int h = t / 3600000;
-  t = t % 3600000;
-  int m = t / 60000;
-  t = t % 60000;
-  int s = t / 1000;
-  int ms = t % 1000;
-  sprintf(str, "%02d:%02d:%02d.%03d", h, m, s, ms);
-  return str;
-}
-
-// Count percentage from cell voltage
 // Battery module — see Battery.h
 #include "Battery.h"
-
-void printConsole(int t, String msg) {
-  Serial.print(TimeToString(millis()));
-  Serial.print(" [");
-  switch (t) {
-    case T_BOOT:
-      Serial.print("BOOT");
-      break;
-    case T_RUN:
-      Serial.print("RUN");
-      break;
-    case T_ERROR:
-      Serial.print("ERROR");
-      break;
-    case T_WIFI:
-      Serial.print("WIFI");
-      break;
-    case T_UPDATE:
-      Serial.print("UPDATE");
-      break;
-    case T_HTTPS:
-      Serial.print("HTTPS");
-      break;
-  }
-  Serial.print("] ");
-  Serial.println(msg);
-}
 
 void initOLED() {
   oledDisplay.begin();
