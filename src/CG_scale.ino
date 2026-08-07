@@ -193,40 +193,8 @@ char *TimeToString(unsigned long t) {
 }
 
 // Count percentage from cell voltage
-int percentBat(float cellVoltage) {
-  int result = 0;
-  int elementCount = DATAPOINTS_PERCENTLIST;
-  byte batTypeArray = batType - 2;
-
-  for (int i = 0; i < elementCount; i++) {
-    if (pgm_read_float(&percentList[batTypeArray][i][1]) == 100) {
-      elementCount = i;
-      break;
-    }
-  }
-
-  float cellempty = pgm_read_float(&percentList[batTypeArray][0][0]);
-  float cellfull = pgm_read_float(&percentList[batTypeArray][elementCount][0]);
-
-  if (cellVoltage >= cellfull) {
-    result = 100;
-  } else if (cellVoltage <= cellempty) {
-    result = 0;
-  } else {
-    for (int i = 0; i <= elementCount; i++) {
-      float curVolt = pgm_read_float(&percentList[batTypeArray][i][0]);
-      if (curVolt >= cellVoltage && i > 0) {
-        float lastVolt = pgm_read_float(&percentList[batTypeArray][i - 1][0]);
-        float curPercent = pgm_read_float(&percentList[batTypeArray][i][1]);
-        float lastPercent = pgm_read_float(&percentList[batTypeArray][i - 1][1]);
-        result = float((cellVoltage - lastVolt) / (curVolt - lastVolt)) * (curPercent - lastPercent) + lastPercent;
-        break;
-      }
-    }
-  }
-
-  return result;
-}
+// Battery module — see Battery.h
+#include "Battery.h"
 
 void printConsole(int t, String msg) {
   Serial.print(TimeToString(millis()));
