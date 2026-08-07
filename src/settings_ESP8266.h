@@ -175,4 +175,3 @@ const char ip[4] =                  {1,2,3,4};    // default IP address
 
 
 // **** end of settings ****
-#warning ESP8266 settings have been loaded
