@@ -198,6 +198,9 @@ const uint8_t *oledFontSmall;
 // (READ) and saveParameter(), autoCalibrate(), runTare(), saveModel(),
 // openModel(), deleteModel() (WRITE).
 
+// EEPROM settings load — see Settings.h
+#include "Settings.h"
+
 // CG (centre-of-gravity) calculation — see Calc.h
 #include "Calc.h"
 
@@ -219,88 +222,8 @@ void setup() {
   EEPROM.begin(EEPROM_SIZE);
   printConsole(T_BOOT, "init filesystem");
 
-  // read settings from eeprom
-  if (EEPROM.read(P_NUMBER_LOADCELLS) != 0xFF) {
-    nLoadcells = EEPROM.read(P_NUMBER_LOADCELLS);
-  }
-
-  for (int i = LC1; i <= LC3; i++) {
-    if (EEPROM.read(P_DISTANCE_X1 + (i * sizeof(float))) != 0xFF) {
-      EEPROM.get(P_DISTANCE_X1 + (i * sizeof(float)), model.distance[i]);
-    }
-
-    if (EEPROM.read(P_LOADCELL1_CALIBRATION_FACTOR + (i * sizeof(float))) != 0xFF) {
-      EEPROM.get(P_LOADCELL1_CALIBRATION_FACTOR + (i * sizeof(float)), calFactorLoadcell[i]);
-    }
-  }
-
-  if (EEPROM.read(P_BAT_TYPE) != 0xFF) {
-    batType = EEPROM.read(P_BAT_TYPE);
-  }
-
-  if (EEPROM.read(P_BATT_CELLS) != 0xFF) {
-    batCells = EEPROM.read(P_BATT_CELLS);
-  }
-
-  if (EEPROM.read(P_REF_WEIGHT) != 0xFF) {
-    EEPROM.get(P_REF_WEIGHT, refWeight);
-  }
-
-  if (EEPROM.read(P_REF_CG) != 0xFF) {
-    EEPROM.get(P_REF_CG, refCG);
-  }
-
-  for (int i = R1; i <= R2; i++) {
-    if (EEPROM.read(P_RESISTOR_R1 + (i * sizeof(float))) != 0xFF) {
-      EEPROM.get(P_RESISTOR_R1 + (i * sizeof(float)), resistor[i]);
-    }
-  }
-
-  if (EEPROM.read(P_SSID_STA) != 0xFF) {
-    EEPROM.get(P_SSID_STA, ssid_STA);
-  }
-
-  if (EEPROM.read(P_PASSWORD_STA) != 0xFF) {
-    EEPROM.get(P_PASSWORD_STA, password_STA);
-  }
-
-  if (EEPROM.read(P_SSID_AP) != 0xFF) {
-    EEPROM.get(P_SSID_AP, ssid_AP);
-  }
-
-  if (EEPROM.read(P_PASSWORD_AP) != 0xFF) {
-    EEPROM.get(P_PASSWORD_AP, password_AP);
-  }
-
-  if (EEPROM.read(P_MODELNAME) != 0xFF) {
-    EEPROM.get(P_MODELNAME, model.name);
-  }
-
-  if (EEPROM.read(P_ENABLE_UPDATE) != 0xFF) {
-    EEPROM.get(P_ENABLE_UPDATE, enableUpdate);
-  }
-
-  if (EEPROM.read(P_ENABLE_OTA) != 0xFF) {
-    EEPROM.get(P_ENABLE_OTA, enableOTA);
-  }
-
-  if (EEPROM.read(P_DEVICENAME) != 0xFF) {
-    EEPROM.get(P_DEVICENAME, device_Name);
-  } else {
-    strcpy(device_Name, ssid_AP);
-  }
-
-  if (EEPROM.read(P_LC1_URL) != 0xFF) {
-    EEPROM.get(P_LC1_URL, loadCellURL[LC1]);
-  }
-
-  if (EEPROM.read(P_LC2_URL) != 0xFF) {
-    EEPROM.get(P_LC2_URL, loadCellURL[LC2]);
-  }
-
-  if (EEPROM.read(P_LC3_URL) != 0xFF) {
-    EEPROM.get(P_LC3_URL, loadCellURL[LC3]);
-  }
+  // read settings from eeprom — see Settings.h
+  loadSettings();
 
   printConsole(T_BOOT, "open last model");
   if (!openModelJson(model.name)) {
