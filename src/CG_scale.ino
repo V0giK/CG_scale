@@ -250,28 +250,8 @@ void setup() {
 
   delay(3000);
 
-  server.on("/getHead", getHead);
-  server.on("/getValue", getValue);
-  server.on("/getRawValue", getRawValue);
-  server.on("/getParameter", getParameter);
-  server.on("/getWiFiNetworks", getWiFiNetworks);
-  server.on("/getVirtualWeight", getVirtualWeight);
-  server.on("/saveParameter", saveParameter);
-  server.on("/autoCalibrate", autoCalibrate);
-  server.on("/tare", runTare);
-  server.on("/saveModel", saveModel);
-  server.on("/openModel", openModel);
-  server.on("/deleteModel", deleteModel);
-
-  server.on("/settings.html", HTTP_POST, []() { server.send(200, "text/plain", ""); }, handleFileUpload);
-
-  server.onNotFound([]() {
-    if (!handleFileRead(server.uri())) {
-      server.send(404, "text/plain", "CGscale Error: 404\n File or URL not Found !");
-    }
-  });
-
-  ElegantOTA.begin(&server);
+  // HTTP route registration — see WebApi.h setupWebApi()
+  setupWebApi();
 
   server.begin();
   printConsole(T_RUN, "Webserver is up and running");

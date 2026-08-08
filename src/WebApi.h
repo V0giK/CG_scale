@@ -79,6 +79,7 @@
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <ElegantOTA.h>
 #include <LittleFS.h>
 
 // ---------- Forward declarations ----------
@@ -92,6 +93,24 @@
 // saveModelJson is a single-argument (String) function in Models.h —
 // there is no JsonObject overload in this codebase.
 
+// Forward-declares for the 12 HTTP handlers below. setupWebApi() (also
+// below) calls them in server.on(...) calls, so they must be declared
+// BEFORE setupWebApi() even though the inline definitions come AFTER.
+// inline functions need forward declarations when they are referenced
+// before their definition appears in the same TU.
+inline void getHead();
+inline void getValue();
+inline void getRawValue();
+inline void getParameter();
+inline void getVirtualWeight();
+inline void getWiFiNetworks();
+inline void saveParameter();
+inline void autoCalibrate();
+inline void runTare();
+inline void saveModel();
+inline void openModel();
+inline void deleteModel();
+
 inline void saveCalFactor(int nLC);
 inline bool runAutoCalibrate();
 inline void tareLoadcells();
@@ -99,6 +118,47 @@ inline bool getLoadcellError();
 inline bool saveModelJson(String name);
 inline bool openModelJson(String name);
 inline bool deleteModelJson(String name);
+
+// ---------- setupWebApi ----------
+//
+// Registers all HTTP route handlers against the global `server` and
+// configures the not-found fallback + ElegantOTA. Called from
+// setup() after the network is up and loadSettings() has run.
+//
+// After this returns, the caller typically calls server.begin() and
+// logs the boot message — those two lines stay in setup() because
+// they're sequential setup glue, not WebApi domain logic.
+//
+// Cross-module deps consumed:
+//   - server (ESP8266WebServer)      from CG_scale.ino
+//   - All 12 HTTP handlers defined below in this header (READ + WRITE)
+//   - handleFileUpload()              from WebFiles.h (POST /settings.html)
+//   - handleFileRead()                from WebFiles.h (not-found fallback)
+
+inline void setupWebApi() {
+  server.on("/getHead", getHead);
+  server.on("/getValue", getValue);
+  server.on("/getRawValue", getRawValue);
+  server.on("/getParameter", getParameter);
+  server.on("/getWiFiNetworks", getWiFiNetworks);
+  server.on("/getVirtualWeight", getVirtualWeight);
+  server.on("/saveParameter", saveParameter);
+  server.on("/autoCalibrate", autoCalibrate);
+  server.on("/tare", runTare);
+  server.on("/saveModel", saveModel);
+  server.on("/openModel", openModel);
+  server.on("/deleteModel", deleteModel);
+
+  server.on("/settings.html", HTTP_POST, []() { server.send(200, "text/plain", ""); }, handleFileUpload);
+
+  server.onNotFound([]() {
+    if (!handleFileRead(server.uri())) {
+      server.send(404, "text/plain", "CGscale Error: 404\n File or URL not Found !");
+    }
+  });
+
+  ElegantOTA.begin(&server);
+}
 
 // ---------- getHead ----------
 //
