@@ -114,7 +114,6 @@ HX711_ADC LoadCell[]{HX711_ADC(PIN_LOADCELL1_DOUT, PIN_LOADCELL1_PD_SCK),
                      HX711_ADC(PIN_LOADCELL3_DOUT, PIN_LOADCELL3_PD_SCK)};
 
 ESP8266WebServer server(80);
-IPAddress apIP(ip[0], ip[1], ip[2], ip[3]);
 WiFiClientSecure httpsClient;
 File fsUploadFile;
 
@@ -146,11 +145,6 @@ uint8_t batType = BAT_TYPE;
 uint8_t batCells = BAT_CELLS;
 float refWeight = REF_WEIGHT;
 float refCG = REF_CG;
-char device_Name[MAX_SSID_PW_LENGHT + 1] = SSID_AP;
-char ssid_STA[MAX_SSID_PW_LENGHT + 1] = SSID_STA;
-char password_STA[MAX_SSID_PW_LENGHT + 1] = PASSWORD_STA;
-char ssid_AP[MAX_SSID_PW_LENGHT + 1] = SSID_AP;
-char password_AP[MAX_SSID_PW_LENGHT + 1] = PASSWORD_AP;
 char loadCellURL[3][MAX_SSID_PW_LENGHT + 1] = {"", "", ""};
 bool enableUpdate = ENABLE_UPDATE;
 bool enableOTA = ENABLE_OTA;
@@ -173,7 +167,6 @@ const uint8_t *oledFontLarge;
 const uint8_t *oledFontNormal;
 const uint8_t *oledFontSmall;
 String updateMsg = "";
-bool wifiSTAmode = true;
 float gitVersion = -1;
 
 // System helpers + console logging — see Util.h
@@ -190,6 +183,9 @@ float gitVersion = -1;
 
 // Model persistence (EEPROM + LittleFS JSON) — see Models.h
 #include "Models.h"
+
+// WiFi credentials, mode, and setupWifi() — see Wifi.h
+#include "Wifi.h"
 
 // send headvalues to client
 void getHead() {
@@ -657,23 +653,6 @@ bool httpsUpdate(uint8_t command) {
   return true;
 }
 
-void waitWiFiconnected() {
-  long timeoutWiFi = millis();
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    if (WiFi.status() == WL_NO_SSID_AVAIL) {
-      printConsole(T_ERROR, "\nWifi: No SSID available");
-      break;
-    } else if (WiFi.status() == WL_CONNECT_FAILED) {
-      printConsole(T_ERROR, "\nWifi: Connection failed");
-      break;
-    } else if ((millis() - timeoutWiFi) > TIMEOUT_CONNECT) {
-      printConsole(T_ERROR, "\nWifi: Timeout");
-      break;
-    }
-  }
-}
-
 void setup() {
   // init serial
   Serial.begin(115200);
@@ -795,68 +774,8 @@ void setup() {
   tareLoadcells();
   getLoadcellError();
 
-  printConsole(T_BOOT, "Wifi: STA mode - connecting with: " + String(ssid_STA));
-
-  WiFi.persistent(false);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid_STA, password_STA);
-
-  waitWiFiconnected();
-
-  if (nLoadcells == 1 && WiFi.status() != WL_CONNECTED) {
-    WiFi.begin(ssid_AP, password_AP);
-    waitWiFiconnected();
-  }
-  /*long timeoutWiFi = millis();
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    if (WiFi.status() == WL_NO_SSID_AVAIL) {
-      printConsole(T_ERROR, "\nWifi: No SSID available");
-      break;
-    } else if (WiFi.status() == WL_CONNECT_FAILED) {
-      printConsole(T_ERROR, "\nWifi: Connection failed");
-      break;
-    } else if ((millis() - timeoutWiFi) > TIMEOUT_CONNECT) {
-      printConsole(T_ERROR, "\nWifi: Timeout");
-      break;
-    }
-  }*/
-
-  if (WiFi.status() != WL_CONNECTED) {
-    wifiSTAmode = false;
-    printConsole(T_BOOT, "Wifi: AP mode - create access point: " + String(ssid_AP));
-    WiFi.mode(WIFI_AP);
-    WiFi.softAPConfig(apIP, apIP,
-                      IPAddress(255, 255, 255, 0));
-    WiFi.softAP(ssid_AP, password_AP);
-    printConsole(T_RUN, "Wifi: Connected, IP: " + String(WiFi.softAPIP().toString()));
-  } else {
-    printConsole(T_RUN, "Wifi: Connected, IP: " + String(WiFi.localIP().toString()));
-  }
-
-  String hostname = "disabled";
-#if ENABLE_MDNS
-  hostname = device_Name;
-  hostname.replace(" ", "");
-  hostname.toLowerCase();
-  if (!MDNS.begin(hostname, WiFi.localIP())) {
-    hostname = "mDNS failed";
-    printConsole(T_ERROR, "Wifi: " + hostname);
-  } else {
-    hostname += ".local";
-    printConsole(T_RUN, "Wifi hostname: " + hostname);
-  }
-#endif
-
-  if (wifiSTAmode) {
-    printOLED("WiFi: " + String(ssid_STA),
-              "Host: " + String(hostname),
-              "IP: " + WiFi.localIP().toString());
-  } else {
-    printOLED("WiFi: " + String(ssid_AP),
-              "Host: " + String(hostname),
-              "IP: " + WiFi.softAPIP().toString());
-  }
+  // WiFi init moved to Wifi.h — see setupWifi()
+  setupWifi();
 
   delay(3000);
 
