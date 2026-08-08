@@ -311,14 +311,8 @@ void setup() {
   // init OLED display
   initOLED();
 
-  // init & tare Loadcells
-  for (int i = LC1; i <= LC3; i++) {
-    if (i < nLoadcells) {
-      LoadCell[i].begin();
-      LoadCell[i].setCalFactor(calFactorLoadcell[i]);
-      printConsole(T_BOOT, "init Loadcell " + String(i + 1));
-    }
-  }
+  // init & tare Loadcells — see HX711Manager.h initLoadcells()
+  initLoadcells();
 
   // stabilize scale values
   while (millis() < STABILISINGTIME) {

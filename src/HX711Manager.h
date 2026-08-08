@@ -151,6 +151,25 @@ inline bool getLoadcellError() {
   return err;
 }
 
+// ---------- initLoadcells ----------
+//
+// Called from setup() after initOLED(). Walks LC1..LC3 (limited by
+// nLoadcells), calls LoadCell[i].begin() + .setCalFactor() for each
+// enabled cell, and logs a T_BOOT message per cell. After this
+// returns, the caller typically runs the stabilize-while-loop and
+// then tareLoadcells() — those stay in the .ino because they are
+// sequential setup glue, not domain logic.
+
+inline void initLoadcells() {
+  for (int i = LC1; i <= LC3; i++) {
+    if (i < nLoadcells) {
+      LoadCell[i].begin();
+      LoadCell[i].setCalFactor(calFactorLoadcell[i]);
+      printConsole(T_BOOT, "init Loadcell " + String(i + 1));
+    }
+  }
+}
+
 // ---------- pollLoadcells ----------
 //
 // Called from loop() once per UPDATE_INTERVAL_LOADCELL after
