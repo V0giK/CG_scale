@@ -115,7 +115,6 @@ HX711_ADC LoadCell[]{HX711_ADC(PIN_LOADCELL1_DOUT, PIN_LOADCELL1_PD_SCK),
 
 ESP8266WebServer server(80);
 WiFiClientSecure httpsClient;
-File fsUploadFile;
 
 #include "defaults.h"
 
@@ -186,6 +185,9 @@ float gitVersion = -1;
 
 // WiFi credentials, mode, and setupWifi() — see Wifi.h
 #include "Wifi.h"
+
+// LittleFS-backed web file serving (MIME / GET / POST upload) — see WebFiles.h
+#include "WebFiles.h"
 
 // send headvalues to client
 void getHead() {
@@ -507,82 +509,8 @@ void deleteModel() {
   server.send(404, "text/plain", "404: Delete model failed !");
 }
 
-// convert the file extension to the MIME type
-String getContentType(String filename) {
-  if (filename.endsWith(".html"))
-    return "text/html";
-  else if (filename.endsWith(".png"))
-    return "image/png";
-  else if (filename.endsWith(".css"))
-    return "text/css";
-  else if (filename.endsWith(".js"))
-    return "application/javascript";
-  else if (filename.endsWith(".map"))
-    return "application/json";
-  else if (filename.endsWith(".ico"))
-    return "image/x-icon";
-  else if (filename.endsWith(".gz"))
-    return "application/x-gzip";
-  return "text/plain";
-}
-
-// send file to the client (if it exists)
-bool handleFileRead(String path) {
-  // If a folder is requested, send the index file
-  if (path.endsWith("/")) {
-    path += "index.html";
-  }
-
-  String contentType = getContentType(path);
-  String pathWithGz = path + ".gz";
-
-  // If the file exists, either as a compressed archive, or normal
-  if (LittleFS.exists(pathWithGz) || LittleFS.exists(path)) {
-    if (LittleFS.exists(pathWithGz)) {
-      path += ".gz";
-    }
-    File file = LittleFS.open(path, "r");
-    server.streamFile(file, contentType);
-    file.close();
-    return true;
-  }
-
-  return false;
-}
-
-// upload a new file to the LittleFS
-void handleFileUpload() {
-  HTTPUpload &upload = server.upload();
-
-  if (upload.status == UPLOAD_FILE_START) {
-    String filename = upload.filename;
-    if (!filename.startsWith("/")) {
-      filename = "/" + filename;
-    }
-
-    if (filename != MODEL_FILE) {
-      server.send(500, "text/plain", "wrong file !");
-      return;
-    }
-
-    // Open the file for writing in LittleFS (create if it doesn't exist)
-    fsUploadFile = LittleFS.open(filename, "w");
-    filename = String();
-  } else if (upload.status == UPLOAD_FILE_WRITE) {
-    // Write the received bytes to the file
-    fsUploadFile.write(upload.buf, upload.currentSize);
-  } else if (upload.status == UPLOAD_FILE_END) {
-    // If the file was successfully created
-    if (fsUploadFile) {
-      fsUploadFile.close();
-      // Redirect the client to the success page
-      server.sendHeader("Location", "/settings.html");
-      server.send(303);
-    } else {
-      server.send(500, "text/plain", "500: couldn't create file");
-    }
-  }
-}
+// Web file serving moved to WebFiles.h — see getContentType(),
+// handleFileRead(), handleFileUpload()
 
 // print update progress screen
 void printUpdateProgress(unsigned int progress, unsigned int total) {
