@@ -145,10 +145,7 @@ uint8_t batCells = BAT_CELLS;
 float refWeight = REF_WEIGHT;
 float refCG = REF_CG;
 char loadCellURL[3][MAX_SSID_PW_LENGHT + 1] = {"", "", ""};
-bool enableUpdate = ENABLE_UPDATE;
 bool enableOTA = ENABLE_OTA;
-
-// declare variables
 float weightLoadCell[] = {0, 0, 0};
 float lastWeightLoadCell[] = {0, 0, 0};
 float weightTotal = 0;
@@ -165,8 +162,6 @@ const uint8_t *oledFontBig;
 const uint8_t *oledFontLarge;
 const uint8_t *oledFontNormal;
 const uint8_t *oledFontSmall;
-String updateMsg = "";
-float gitVersion = -1;
 
 // System helpers + console logging — see Util.h
 #include "Util.h"
@@ -188,6 +183,9 @@ float gitVersion = -1;
 
 // LittleFS-backed web file serving (MIME / GET / POST upload) — see WebFiles.h
 #include "WebFiles.h"
+
+// OTA update probe + progress screen — see OtaUpdate.h
+#include "OtaUpdate.h"
 
 // send headvalues to client
 void getHead() {
@@ -512,74 +510,8 @@ void deleteModel() {
 // Web file serving moved to WebFiles.h — see getContentType(),
 // handleFileRead(), handleFileUpload()
 
-// print update progress screen
-void printUpdateProgress(unsigned int progress, unsigned int total) {
-  printConsole(T_UPDATE, updateMsg);
-
-  oledDisplay.firstPage();
-  do {
-    oledDisplay.setFont(oledFontSmall);
-    oledDisplay.setCursor(0, 12);
-    oledDisplay.print(updateMsg);
-
-    oledDisplay.setCursor(107, 35);
-    oledDisplay.printf("%u%%\r", (progress / (total / 100)));
-
-    oledDisplay.drawFrame(0, 40, 128, 10);
-    oledDisplay.drawBox(0, 40, (progress / (total / 128)), 10);
-
-  } while (oledDisplay.nextPage());
-}
-
-// https update
-bool httpsUpdate(uint8_t command) {
-  if (!httpsClient.connect(HOST, HTTPS_PORT)) {
-    printConsole(T_ERROR, "Wifi: connection to GIT failed");
-    return false;
-  }
-
-  const char *headerKeys[] = {"Location"};
-  const size_t numberOfHeaders = 1;
-
-  HTTPClient https;
-  https.setUserAgent("cgscale");
-  https.setRedirectLimit(0);
-  https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-
-  String url = "https://" + String(HOST) + String(URL);
-  if (https.begin(httpsClient, url)) {
-    https.collectHeaders(headerKeys, numberOfHeaders);
-
-    printConsole(T_HTTPS, "GET: " + url);
-    int httpCode = https.GET();
-    if (httpCode > 0) {
-      // response
-      if (httpCode == HTTP_CODE_FOUND) {
-        String newUrl = https.header("Location");
-        gitVersion = newUrl.substring(newUrl.lastIndexOf('/') + 2).toFloat();
-        if (gitVersion > String(CGSCALE_VERSION).toFloat()) {
-          printConsole(T_UPDATE, "Firmware update available: V" + String(gitVersion));
-        } else {
-          printConsole(T_UPDATE, "Firmware version found on GitHub: V" + String(gitVersion) + " - current firmware is up to date");
-        }
-      } else if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
-        // Serial.println(https.getString());
-      } else {
-        printConsole(T_ERROR, "HTTPS: GET... failed, " + https.errorToString(httpCode));
-        https.end();
-        return false;
-      }
-    } else {
-      return false;
-    }
-    https.end();
-  } else {
-    printConsole(T_ERROR, "Wifi: Unable to connect");
-    return false;
-  }
-
-  return true;
-}
+// OTA update probe + progress screen (updateMsg, gitVersion, enableUpdate,
+// printUpdateProgress, httpsUpdate) moved to OtaUpdate.h
 
 void setup() {
   // init serial
