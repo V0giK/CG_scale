@@ -48,7 +48,9 @@
 
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <ESP8266HTTPClient.h>
 #include <HX711_ADC.h>
+#include <WiFiClient.h>
 
 // Forward declarations — these functions call each other and must be
 // declared before their first use, even though they're inline.
@@ -147,4 +149,89 @@ inline bool getLoadcellError() {
   }
 
   return err;
+}
+
+// ---------- pollLoadcells ----------
+//
+// Called from loop() once per UPDATE_INTERVAL_LOADCELL after
+// getLoadcellError() and the battery-voltage read. Walks LC1..LC3
+// (limited by nLoadcells), and for each cell either:
+//   - reads weight directly from the local HX711 and applies
+//     SMOOTHING_LOADCELL exponential smoothing, OR
+//   - if a loadCellURL is set for that cell, fetches the remote
+//     /getRawValue JSON, parses the "&"-separated fields, and uses
+//     the remote weight. Also picks up the remote battery voltage
+//     (subString[3]) when both batteries are in percent mode and the
+//     remote battery is lower — that's the "lowest wins" semantics
+//     to surface a low remote battery on the local display.
+//
+// Errors are accumulated into errMsg[]/errMsgCnt (cross-cutting
+// state, read by getHead()).
+//
+// Cross-module deps consumed:
+//   - LoadCell[]                from CG_scale.ino (global constructor)
+//   - loadCellURL[][]           from CG_scale.ino (stayed there per
+//                               PR 3a step 1 rationale)
+//   - errMsg[], errMsgCnt       from CG_scale.ino (cross-cutting)
+//   - batType, batVolt          from CG_scale.ino (writes batVolt
+//                               only in the remote-cell branch)
+//   - B_VOLT                    from defaults.h
+//   - nLoadcells                from CG_scale.ino
+//   - LC1/LC2/LC3,              from defaults.h
+//     SMOOTHING_LOADCELL
+//   - WiFi, HTTPClient          from ESP8266WiFi.h / ESP8266HTTPClient.h
+//   - printConsole(T_*, String) from Util.h
+//
+// Note: the HTTP fetch block keeps its original parsing style
+// (subString[] array + while-loop over '&'). It works and is
+// byte-identical to the original loop() block — refactor it for
+// readability in a later PR, not here.
+
+inline void pollLoadcells() {
+  for (int i = LC1; i <= LC3; i++) {
+    if (i < nLoadcells) {
+      if (strlen(loadCellURL[i]) == 0) {
+        weightLoadCell[i] = LoadCell[i].getData();
+
+        weightLoadCell[i] = weightLoadCell[i] + SMOOTHING_LOADCELL * (lastWeightLoadCell[i] - weightLoadCell[i]);
+        lastWeightLoadCell[i] = weightLoadCell[i];
+      } else {
+        WiFiClient client;
+        HTTPClient http;
+
+        http.begin(client,
+                   "http://" + String(loadCellURL[i]) + "/getRawValue");
+        http.setTimeout(2000);
+        int httpCode = http.GET();
+
+        if (httpCode == HTTP_CODE_OK) {
+          const String &txt = http.getString();
+
+          int delimiterStartIndex = 0;
+          int delimiterEndIndex = 0;
+          String subString[10];
+          int subStringCount = 0;
+          while (delimiterEndIndex > -1) {
+            delimiterEndIndex = txt.indexOf('&', delimiterStartIndex);
+            subString[subStringCount] = txt.substring(delimiterStartIndex, delimiterEndIndex);
+            ++subStringCount;
+            delimiterStartIndex = delimiterEndIndex + 1;
+          }
+
+          weightLoadCell[i] = subString[LC1].toFloat();
+
+          float extBatVolt = subString[3].toFloat();
+          if (batType > B_VOLT && batVolt > extBatVolt) {
+            batVolt = extBatVolt;
+          }
+        } else {
+          String msg = "ERROR: Lc" + String(i + 1) + " no data";
+          errMsg[++errMsgCnt] = msg + "\n";
+          printConsole(T_ERROR, msg);
+        }
+
+        http.end();
+      }
+    }
+  }
 }

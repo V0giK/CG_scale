@@ -433,7 +433,7 @@ void loop() {
     errMsgCnt = 0;
     getLoadcellError();
 
-    // read battery voltage
+    // read battery voltage — stays in .ino (Battery domain, writes batVolt)
     if (batType > B_OFF) {
       batVolt = (analogRead(VOLTAGE_PIN) / 1024.0) * V_REF * ((resistor[R1] + resistor[R2]) / resistor[R2]) / 1000.0;
 #if ENABLE_PERCENTLIST
@@ -443,53 +443,8 @@ void loop() {
 #endif
     }
 
-    // get Loadcell weights
-    for (int i = LC1; i <= LC3; i++) {
-      if (i < nLoadcells) {
-        if (strlen(loadCellURL[i]) == 0) {
-          weightLoadCell[i] = LoadCell[i].getData();
-
-          weightLoadCell[i] = weightLoadCell[i] + SMOOTHING_LOADCELL * (lastWeightLoadCell[i] - weightLoadCell[i]);
-          lastWeightLoadCell[i] = weightLoadCell[i];
-        } else {
-          WiFiClient client;
-          HTTPClient http;
-
-          http.begin(client,
-                     "http://" + String(loadCellURL[i]) + "/getRawValue");
-          http.setTimeout(2000);
-          int httpCode = http.GET();
-
-          if (httpCode == HTTP_CODE_OK) {
-            const String &txt = http.getString();
-
-            int delimiterStartIndex = 0;
-            int delimiterEndIndex = 0;
-            String subString[10];
-            int subStringCount = 0;
-            while (delimiterEndIndex > -1) {
-              delimiterEndIndex = txt.indexOf('&', delimiterStartIndex);
-              subString[subStringCount] = txt.substring(delimiterStartIndex, delimiterEndIndex);
-              ++subStringCount;
-              delimiterStartIndex = delimiterEndIndex + 1;
-            }
-
-            weightLoadCell[i] = subString[LC1].toFloat();
-
-            float extBatVolt = subString[3].toFloat();
-            if (batType > B_VOLT && batVolt > extBatVolt) {
-              batVolt = extBatVolt;
-            }
-          } else {
-            String msg = "ERROR: Lc" + String(i + 1) + " no data";
-            errMsg[++errMsgCnt] = msg + "\n";
-            printConsole(T_ERROR, msg);
-          }
-
-          http.end();
-        }
-      }
-    }
+    // get Loadcell weights — moved to HX711Manager.h pollLoadcells()
+    pollLoadcells();
   }
 
   // update display and serial menu
