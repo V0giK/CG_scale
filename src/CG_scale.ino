@@ -198,6 +198,9 @@ const uint8_t *oledFontSmall;
 // (READ) and saveParameter(), autoCalibrate(), runTare(), saveModel(),
 // openModel(), deleteModel() (WRITE).
 
+// CG (centre-of-gravity) calculation — see Calc.h
+#include "Calc.h"
+
 // Web file serving moved to WebFiles.h — see getContentType(),
 // handleFileRead(), handleFileUpload()
 
@@ -493,44 +496,8 @@ void loop() {
   if ((millis() - lastTimeMenu) > UPDATE_INTERVAL_OLED_MENU) {
     lastTimeMenu = millis();
 
-    // total model weight
-    weightTotal = weightLoadCell[LC1] + weightLoadCell[LC2] + weightLoadCell[LC3];
-    if (weightTotal < MINIMAL_TOTAL_WEIGHT && weightTotal > MINIMAL_TOTAL_WEIGHT * -1) {
-      weightTotal = 0;
-    }
-
-    if (weightTotal > MINIMAL_CG_WEIGHT) {
-      if (nLoadcells > 1) {
-        // CG longitudinal axis
-        CG_length = ((weightLoadCell[LC2] * model.distance[X2]) / weightTotal) + model.distance[X1];
-
-        if (model.mechanicsType == 2) {
-          CG_length = ((weightLoadCell[LC2] * model.distance[X2]) / weightTotal) - model.distance[X1];
-        } else if (model.mechanicsType == 3) {
-          CG_length = ((weightLoadCell[LC2] * model.distance[X2]) / weightTotal) * -1 + model.distance[X1];
-        }
-
-        for (int i = 0; i < MAX_VIRTUAL_WEIGHT; i++) {
-          if (model.virtualWeight[i].enabled == true) {
-            CG_length = (weightTotal * CG_length + model.virtualWeight[i].weight * model.virtualWeight[i].cg) / (weightTotal + model.virtualWeight[i].weight);
-          }
-        }
-
-        for (int i = 0; i < MAX_VIRTUAL_WEIGHT; i++) {
-          if (model.virtualWeight[i].enabled == true) {
-            weightTotal += model.virtualWeight[i].weight;
-          }
-        }
-
-        // CG transverse axis
-        if (nLoadcells == 3) {
-          CG_trans = (model.distance[X3] / 2) - (((weightLoadCell[LC1] + weightLoadCell[LC2] / 2) * model.distance[X3]) / weightTotal);
-        }
-      }
-    } else {
-      CG_length = 0;
-      CG_trans = 0;
-    }
+    // total model weight + CG — see Calc.h
+    calcCG();
 
     printScaleOLED();
 
