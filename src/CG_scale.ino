@@ -257,46 +257,8 @@ void setup() {
   printConsole(T_RUN, "Webserver is up and running");
 
   if (enableOTA) {
-    ArduinoOTA.setHostname(ssid_AP);
-    ArduinoOTA.setPassword(password_AP);
-
-    ArduinoOTA.onStart([]() {
-      String type;
-      if (ArduinoOTA.getCommand() == U_FLASH) {
-        type = "firmware";
-      } else {
-        type = "LittleFS";
-      }
-      updateMsg = "Updating " + type;
-      printConsole(T_UPDATE, type);
-    });
-
-    ArduinoOTA.onEnd([]() {
-      updateMsg = "successful..";
-      printUpdateProgress(100, 100);
-    });
-
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-      printUpdateProgress(progress, total);
-    });
-
-    ArduinoOTA.onError([](ota_error_t error) {
-      if (error == OTA_AUTH_ERROR) {
-        updateMsg = "Auth Failed";
-      } else if (error == OTA_BEGIN_ERROR) {
-        updateMsg = "Begin Failed";
-      } else if (error == OTA_CONNECT_ERROR) {
-        updateMsg = "Connect Failed";
-      } else if (error == OTA_RECEIVE_ERROR) {
-        updateMsg = "Receive Failed";
-      } else if (error == OTA_END_ERROR) {
-        updateMsg = "End Failed";
-      }
-      printUpdateProgress(0, 100);
-    });
-
-    ArduinoOTA.begin();
-    printConsole(T_RUN, "OTA is up and running");
+    // ArduinoOTA setup — see OtaUpdate.h setupArduinoOTA()
+    setupArduinoOTA();
   }
 
   httpsClient.setInsecure();
