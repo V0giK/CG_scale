@@ -62,10 +62,14 @@ CG scale with 3 Loadcells:
 
 #define STABILISINGTIME               3000     // ms
 
-#define UPDATE_INTERVAL_OLED_MENU     500      // ms
-#define UPDATE_INTERVAL_LOADCELL      100      // ms
+#define UPDATE_INTERVAL_OLED_MENU     200      // ms  (was 500 — see commit "tune webui latency")
+#define UPDATE_INTERVAL_LOADCELL      100      // ms  (HX711 internal sample rate is the floor)
 
-#define SMOOTHING_LOADCELL            0.4     // IIR filter: smoothing value from 0.00-1.00
+#define SMOOTHING_LOADCELL            0.15    // IIR filter: smoothing value from 0.00-1.00
+                                              //   (was 0.4 — lowered to ~3x faster visible response
+                                              //    on weight change; OLED still stable under normal
+                                              //    bench-weighing vibration. Do NOT lower below 0.05
+                                              //    without checking on real hardware.)
 
 #define MINIMAL_CG_WEIGHT             10      // g     if lower, no CG is displayed (0mm)
 #define MINIMAL_TOTAL_WEIGHT          1       // g     if lower, weight = 0 is displayed
